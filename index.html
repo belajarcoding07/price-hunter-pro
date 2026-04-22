@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Price Hunter Pro — Riset Supplier Indonesia</title>
+  <meta name="description" content="Platform riset harga dan supplier B2B Indonesia terpercaya" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0a0f1e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="PriceHunter" />
+  <link rel="apple-touch-icon" href="assets/icon-192.png" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+
+<!-- ============ LOADING SCREEN ============ -->
+<div id="loadingScreen" class="loading-screen">
+  <div class="loader-inner">
+    <div class="loader-logo">
+      <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+        <circle cx="26" cy="26" r="24" stroke="url(#grad1)" stroke-width="2.5"/>
+        <path d="M14 26 L22 18 L30 26 L38 18" stroke="url(#grad2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M14 34 L22 26 L30 34 L38 26" stroke="url(#grad3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+        <defs>
+          <linearGradient id="grad1" x1="0" y1="0" x2="52" y2="52">
+            <stop offset="0%" stop-color="#3b82f6"/>
+            <stop offset="100%" stop-color="#f59e0b"/>
+          </linearGradient>
+          <linearGradient id="grad2" x1="0" y1="0" x2="52" y2="52">
+            <stop offset="0%" stop-color="#3b82f6"/>
+            <stop offset="100%" stop-color="#10b981"/>
+          </linearGradient>
+          <linearGradient id="grad3" x1="0" y1="0" x2="52" y2="52">
+            <stop offset="0%" stop-color="#f59e0b"/>
+            <stop offset="100%" stop-color="#3b82f6"/>
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+    <div class="loader-text">PRICE HUNTER PRO</div>
+    <div class="loader-bar"><div class="loader-fill"></div></div>
+    <div class="loader-sub">Memuat sistem pencarian supplier Indonesia...</div>
+  </div>
+</div>
+
+<!-- ============ SIDEBAR ============ -->
+<nav id="sidebar" class="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">
+      <svg width="32" height="32" viewBox="0 0 52 52" fill="none">
+        <circle cx="26" cy="26" r="24" stroke="url(#sgrad1)" stroke-width="2.5"/>
+        <path d="M14 26 L22 18 L30 26 L38 18" stroke="url(#sgrad2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <defs>
+          <linearGradient id="sgrad1" x1="0" y1="0" x2="52" y2="52">
+            <stop offset="0%" stop-color="#3b82f6"/>
+            <stop offset="100%" stop-color="#f59e0b"/>
+          </linearGradient>
+          <linearGradient id="sgrad2" x1="0" y1="0" x2="52" y2="52">
+            <stop offset="0%" stop-color="#3b82f6"/>
+            <stop offset="100%" stop-color="#10b981"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <div class="logo-text">
+        <span class="logo-main">Price Hunter</span>
+        <span class="logo-sub">PRO</span>
+      </div>
+    </div>
+    <button id="sidebarToggle" class="sidebar-toggle" title="Toggle sidebar">
+      <i class="fas fa-bars"></i>
+    </button>
+  </div>
+
+  <div class="sidebar-nav">
+    <a href="#" class="nav-item active" data-page="search">
+      <i class="fas fa-search"></i>
+      <span>Cari Supplier</span>
+    </a>
+    <a href="#" class="nav-item" data-page="history">
+      <i class="fas fa-history"></i>
+      <span>Riwayat Pencarian</span>
+      <span class="nav-badge" id="historyBadge">0</span>
+    </a>
+    <a href="#" class="nav-item" data-page="favorites">
+      <i class="fas fa-star"></i>
+      <span>Supplier Favorit</span>
+      <span class="nav-badge" id="favBadge">0</span>
+    </a>
+    <a href="#" class="nav-item" data-page="followup">
+      <i class="fas fa-tasks"></i>
+      <span>Follow Up</span>
+    </a>
+    <a href="#" class="nav-item" data-page="dashboard">
+      <i class="fas fa-chart-line"></i>
+      <span>Dashboard</span>
+    </a>
+    <a href="#" class="nav-item" data-page="settings">
+      <i class="fas fa-cog"></i>
+      <span>Pengaturan</span>
+    </a>
+  </div>
+
+  <div class="sidebar-footer">
+    <button id="themeToggle" class="theme-btn">
+      <i class="fas fa-moon" id="themeIcon"></i>
+      <span id="themeLabel">Dark Mode</span>
+    </button>
+  </div>
+</nav>
+
+<!-- ============ MAIN CONTENT ============ -->
+<main class="main-content" id="mainContent">
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <button id="mobileMenuBtn" class="mobile-menu-btn">
+      <i class="fas fa-bars"></i>
+    </button>
+    <div class="topbar-title" id="topbarTitle">Cari Supplier</div>
+    <div class="topbar-actions">
+      <div class="connection-status" id="connectionStatus">
+        <span class="status-dot online"></span>
+        <span class="status-text">Online</span>
+      </div>
+      <button class="topbar-btn" id="notifBtn" title="Notifikasi">
+        <i class="fas fa-bell"></i>
+        <span class="notif-dot" id="notifDot" style="display:none"></span>
+      </button>
+      <button class="topbar-btn" id="syncBtn" title="Sync Google Sheets">
+        <i class="fas fa-sync-alt" id="syncIcon"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- =========== PAGE: SEARCH =========== -->
+  <section class="page active" id="page-search">
+    <!-- Search Hero -->
+    <div class="search-hero">
+      <div class="hero-text">
+        <h1 class="hero-title">Temukan Supplier <span class="gradient-text">Terbaik Indonesia</span></h1>
+        <p class="hero-sub">Input barang sekali — sistem cari di ratusan sumber B2B sekaligus</p>
+      </div>
+      
+      <!-- Main Search Form -->
+      <div class="search-card">
+        <div class="search-grid">
+          <div class="field-group field-wide">
+            <label class="field-label">
+              <i class="fas fa-box"></i> Nama Barang
+            </label>
+            <div class="autocomplete-wrap">
+              <input type="text" id="itemName" class="field-input" placeholder="Contoh: Besi hollow, Pipa galvanis, Oli mesin..." autocomplete="off" />
+              <div class="autocomplete-dropdown" id="autocompleteDropdown"></div>
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">
+              <i class="fas fa-sliders-h"></i> Spesifikasi
+            </label>
+            <input type="text" id="itemSpec" class="field-input" placeholder="Ukuran, merek, tipe, grade..." />
+          </div>
+          <div class="field-group field-narrow">
+            <label class="field-label">
+              <i class="fas fa-cubes"></i> Jumlah (Qty)
+            </label>
+            <input type="text" id="itemQty" class="field-input" placeholder="50 pcs, 1 ton..." />
+          </div>
+          <div class="field-group field-narrow">
+            <label class="field-label">
+              <i class="fas fa-map-marker-alt"></i> Lokasi Target
+            </label>
+            <input type="text" id="itemLocation" class="field-input" placeholder="Jakarta, Surabaya..." />
+          </div>
+        </div>
+
+        <!-- Source Filters -->
+        <div class="source-filters">
+          <span class="filter-label">Sumber Pencarian:</span>
+          <label class="source-chip">
+            <input type="checkbox" checked data-source="indotrading"> Indotrading
+          </label>
+          <label class="source-chip">
+            <input type="checkbox" checked data-source="indonetwork"> Indonetwork
+          </label>
+          <label class="source-chip">
+            <input type="checkbox" checked data-source="gmaps"> Google Maps
+          </label>
+          <label class="source-chip">
+            <input type="checkbox" checked data-source="web"> Web Resmi
+          </label>
+          <label class="source-chip">
+            <input type="checkbox" checked data-source="facebook"> Facebook
+          </label>
+          <label class="source-chip">
+            <input type="checkbox" checked data-source="olx"> OLX Bisnis
+          </label>
+        </div>
+
+        <div class="search-actions">
+          <button class="btn-search" id="searchBtn">
+            <i class="fas fa-satellite-dish"></i>
+            <span>Mulai Cari Supplier</span>
+            <div class="btn-shimmer"></div>
+          </button>
+          <button class="btn-clear" id="clearBtn">
+            <i class="fas fa-times"></i> Bersihkan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search Progress -->
+    <div class="search-progress" id="searchProgress" style="display:none">
+      <div class="progress-header">
+        <div class="progress-title">
+          <div class="pulse-dot"></div>
+          Sedang memindai sumber supplier...
+        </div>
+        <div class="progress-count" id="progressCount">0 supplier ditemukan</div>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" id="progressBar" style="width:0%"></div>
+      </div>
+      <div class="progress-sources" id="progressSources"></div>
+    </div>
+
+    <!-- Filter Bar (shown after results) -->
+    <div class="result-toolbar" id="resultToolbar" style="display:none">
+      <div class="result-info">
+        <span class="result-count" id="resultCount">0</span> supplier ditemukan
+        <span class="result-query" id="resultQuery"></span>
+      </div>
+      <div class="result-filters">
+        <select class="filter-select" id="filterProvince">
+          <option value="">Semua Provinsi</option>
+        </select>
+        <select class="filter-select" id="filterPrice">
+          <option value="">Semua Harga</option>
+          <option value="with_price">Ada Harga</option>
+          <option value="no_price">Tanpa Harga</option>
+        </select>
+        <select class="filter-select" id="filterSort">
+          <option value="relevance">Relevansi</option>
+          <option value="price_asc">Harga Terendah</option>
+          <option value="price_desc">Harga Tertinggi</option>
+          <option value="rating">Rating</option>
+        </select>
+        <button class="btn-export" id="exportBtn">
+          <i class="fas fa-file-pdf"></i> Export PDF
+        </button>
+      </div>
+    </div>
+
+    <!-- Price Comparison Chart (shown when ≥2 price results) -->
+    <div class="price-compare-card" id="priceCompareCard" style="display:none">
+      <div class="card-header-row">
+        <h3><i class="fas fa-chart-bar"></i> Perbandingan Harga</h3>
+        <span class="compare-subtitle" id="compareSubtitle"></span>
+      </div>
+      <div class="price-bars" id="priceBars"></div>
+    </div>
+
+    <!-- Results Grid -->
+    <div class="results-grid" id="resultsGrid"></div>
+
+    <!-- Empty State -->
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">
+        <i class="fas fa-search"></i>
+      </div>
+      <h3>Siap Berburu Supplier</h3>
+      <p>Masukkan nama barang yang ingin Anda cari, lalu klik "Mulai Cari Supplier"</p>
+    </div>
+  </section>
+
+  <!-- =========== PAGE: HISTORY =========== -->
+  <section class="page" id="page-history">
+    <div class="page-header">
+      <h2 class="page-title"><i class="fas fa-history"></i> Riwayat Pencarian</h2>
+      <button class="btn-danger-sm" id="clearHistoryBtn">
+        <i class="fas fa-trash"></i> Hapus Semua
+      </button>
+    </div>
+    <div class="history-list" id="historyList">
+      <div class="empty-state">
+        <div class="empty-icon"><i class="fas fa-clock"></i></div>
+        <h3>Belum Ada Riwayat</h3>
+        <p>Pencarian Anda akan tersimpan otomatis di sini</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========== PAGE: FAVORITES =========== -->
+  <section class="page" id="page-favorites">
+    <div class="page-header">
+      <h2 class="page-title"><i class="fas fa-star"></i> Supplier Favorit</h2>
+    </div>
+    <div class="results-grid" id="favoritesGrid">
+      <div class="empty-state" style="grid-column:1/-1">
+        <div class="empty-icon"><i class="fas fa-star"></i></div>
+        <h3>Belum Ada Favorit</h3>
+        <p>Klik ikon bintang pada kartu supplier untuk menyimpannya di sini</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========== PAGE: FOLLOW UP =========== -->
+  <section class="page" id="page-followup">
+    <div class="page-header">
+      <h2 class="page-title"><i class="fas fa-tasks"></i> Status Follow Up Supplier</h2>
+    </div>
+    <div class="followup-kanban" id="followupKanban">
+      <div class="kanban-col" data-status="belum">
+        <div class="kanban-header belum-header">
+          <i class="fas fa-circle"></i> Belum Dihubungi
+          <span class="kanban-count" id="count-belum">0</span>
+        </div>
+        <div class="kanban-cards" id="kanban-belum"></div>
+      </div>
+      <div class="kanban-col" data-status="sudah">
+        <div class="kanban-header sudah-header">
+          <i class="fas fa-paper-plane"></i> Sudah Dihubungi
+          <span class="kanban-count" id="count-sudah">0</span>
+        </div>
+        <div class="kanban-cards" id="kanban-sudah"></div>
+      </div>
+      <div class="kanban-col" data-status="menunggu">
+        <div class="kanban-header menunggu-header">
+          <i class="fas fa-hourglass-half"></i> Menunggu Balasan
+          <span class="kanban-count" id="count-menunggu">0</span>
+        </div>
+        <div class="kanban-cards" id="kanban-menunggu"></div>
+      </div>
+      <div class="kanban-col" data-status="deal">
+        <div class="kanban-header deal-header">
+          <i class="fas fa-check-circle"></i> Deal
+          <span class="kanban-count" id="count-deal">0</span>
+        </div>
+        <div class="kanban-cards" id="kanban-deal"></div>
+      </div>
+      <div class="kanban-col" data-status="tidak_deal">
+        <div class="kanban-header tidak-header">
+          <i class="fas fa-times-circle"></i> Tidak Deal
+          <span class="kanban-count" id="count-tidak_deal">0</span>
+        </div>
+        <div class="kanban-cards" id="kanban-tidak_deal"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========== PAGE: DASHBOARD =========== -->
+  <section class="page" id="page-dashboard">
+    <div class="page-header">
+      <h2 class="page-title"><i class="fas fa-chart-line"></i> Dashboard Statistik</h2>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon blue"><i class="fas fa-search"></i></div>
+        <div class="stat-info">
+          <div class="stat-number" id="statSearches">0</div>
+          <div class="stat-label">Total Pencarian</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green"><i class="fas fa-store"></i></div>
+        <div class="stat-info">
+          <div class="stat-number" id="statSuppliers">0</div>
+          <div class="stat-label">Total Supplier Ditemukan</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon gold"><i class="fas fa-handshake"></i></div>
+        <div class="stat-info">
+          <div class="stat-number" id="statDeals">0</div>
+          <div class="stat-label">Deal Berhasil</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon emerald"><i class="fas fa-star"></i></div>
+        <div class="stat-info">
+          <div class="stat-number" id="statFavorites">0</div>
+          <div class="stat-label">Supplier Favorit</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dashboard-row">
+      <div class="dash-card">
+        <h3 class="dash-card-title"><i class="fas fa-fire"></i> Barang Paling Sering Dicari</h3>
+        <div class="top-items-list" id="topItemsList">
+          <p class="no-data">Belum ada data pencarian</p>
+        </div>
+      </div>
+      <div class="dash-card">
+        <h3 class="dash-card-title"><i class="fas fa-map-marker-alt"></i> Sebaran Supplier per Kota</h3>
+        <div class="city-list" id="cityList">
+          <p class="no-data">Belum ada data</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========== PAGE: SETTINGS =========== -->
+  <section class="page" id="page-settings">
+    <div class="page-header">
+      <h2 class="page-title"><i class="fas fa-cog"></i> Pengaturan</h2>
+    </div>
+    <div class="settings-grid">
+      
+      <div class="settings-card">
+        <div class="settings-card-header">
+          <i class="fas fa-server"></i>
+          <h3>Backend API</h3>
+        </div>
+        <div class="field-group">
+          <label class="field-label">URL Backend Koyeb</label>
+          <input type="text" id="settingBackendUrl" class="field-input" placeholder="https://your-app.koyeb.app" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Status Koneksi</label>
+          <div class="connection-test">
+            <div class="conn-status" id="backendStatus">Belum diuji</div>
+            <button class="btn-test" id="testBackendBtn">Test Koneksi</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <div class="settings-card-header">
+          <i class="fab fa-google"></i>
+          <h3>Google Sheets</h3>
+        </div>
+        <div class="field-group">
+          <label class="field-label">URL Apps Script (Web App)</label>
+          <input type="text" id="settingGsUrl" class="field-input" placeholder="https://script.google.com/macros/s/.../exec" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Status Sync</label>
+          <div class="connection-test">
+            <div class="conn-status" id="gsStatus">Belum diuji</div>
+            <button class="btn-test" id="testGsBtn">Test Koneksi</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <div class="settings-card-header">
+          <i class="fab fa-whatsapp"></i>
+          <h3>Notifikasi WhatsApp (Callmebot)</h3>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Nomor WhatsApp Anda</label>
+          <input type="text" id="settingWaNumber" class="field-input" placeholder="628123456789" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">API Key Callmebot</label>
+          <input type="text" id="settingWaApiKey" class="field-input" placeholder="123456" />
+        </div>
+        <button class="btn-test-wa" id="testWaBtn">
+          <i class="fab fa-whatsapp"></i> Test Kirim Pesan
+        </button>
+      </div>
+
+      <div class="settings-card">
+        <div class="settings-card-header">
+          <i class="fas fa-user"></i>
+          <h3>Profil Broker</h3>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Nama Broker / Perusahaan</label>
+          <input type="text" id="settingBrokerName" class="field-input" placeholder="Nama Anda atau perusahaan" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Nomor WhatsApp untuk CTA Supplier</label>
+          <input type="text" id="settingBrokerWa" class="field-input" placeholder="628123456789" />
+        </div>
+        <button class="btn-save-settings" id="saveSettingsBtn">
+          <i class="fas fa-save"></i> Simpan Pengaturan
+        </button>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<!-- ============ MODAL: SUPPLIER DETAIL ============ -->
+<div class="modal-overlay" id="supplierModal" style="display:none">
+  <div class="modal-box">
+    <button class="modal-close" id="modalClose"><i class="fas fa-times"></i></button>
+    <div class="modal-content" id="modalContent"></div>
+  </div>
+</div>
+
+<!-- ============ TOAST NOTIFICATIONS ============ -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ============ SIDEBAR OVERLAY (mobile) ============ -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<script src="js/config.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/api.js"></script>
+<script src="js/search.js"></script>
+<script src="js/render.js"></script>
+<script src="js/followup.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/export.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
