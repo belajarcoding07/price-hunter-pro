@@ -3,7 +3,7 @@
 // =============================================
 window.APP_CONFIG = {
   // Ganti dengan URL backend Koyeb Anda setelah deploy
-  BACKEND_URL: localStorage.getItem('php_backend_url') || '',
+  BACKEND_URL: localStorage.getItem('php_backend_url') || 'https://price-hunter-pro.onrender.com' ,
   
   // Google Apps Script Web App URL
   GS_URL: localStorage.getItem('php_gs_url') || '',
