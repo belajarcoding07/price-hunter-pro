@@ -1,11 +1,5 @@
-// =============================================
-// PRICE HUNTER PRO — BACKEND SERVER
-// Node.js + Express + Playwright
-// Deploy ke Koyeb.com (gratis)
-// =============================================
 const express = require('express');
 const cors = require('cors');
-const { chromium } = require('playwright');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -13,386 +7,203 @@ const PORT = process.env.PORT || 3001;
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// ---- HEALTH CHECK ----
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', version: '1.0.0', service: 'Price Hunter Pro Backend' });
+  res.json({ status: 'ok', version: '2.0.0', service: 'Price Hunter Pro Backend' });
 });
-
-// ---- MAIN SEARCH ENDPOINT ----
-app.post('/api/search', async (req, res) => {
-  const { itemName, itemSpec, itemQty, location, sources = [] } = req.body;
-
-  if (!itemName) {
-    return res.status(400).json({ error: 'itemName diperlukan' });
-  }
-
-  const query = [itemName, itemSpec].filter(Boolean).join(' ');
-  const locationQuery = location || 'Indonesia';
-
-  let allResults = [];
-  const errors = [];
-
-  // Run scraping in parallel per source
-  const scrapers = [];
-  if (!sources.length || sources.includes('indotrading')) scrapers.push(scrapeIndotrading(query, locationQuery));
-  if (!sources.length || sources.includes('indonetwork')) scrapers.push(scrapeIndonetwork(query, locationQuery));
-  if (!sources.length || sources.includes('web')) scrapers.push(scrapeWebSearch(query, locationQuery, 'distributor supplier pabrik'));
-  if (!sources.length || sources.includes('gmaps')) scrapers.push(scrapeGoogleMaps(query, locationQuery));
-  if (!sources.length || sources.includes('facebook')) scrapers.push(scrapeFacebook(query, locationQuery));
-  if (!sources.length || sources.includes('olx')) scrapers.push(scrapeOLX(query, locationQuery));
-
-  const settled = await Promise.allSettled(scrapers);
-  settled.forEach(r => {
-    if (r.status === 'fulfilled') allResults.push(...(r.value || []));
-    else errors.push(r.reason?.message || 'Scraping error');
-  });
-
-  // Deduplicate by name+location
-  const seen = new Set();
-  const unique = allResults.filter(s => {
-    const key = `${s.name}_${s.location}`.toLowerCase().replace(/\s+/g,'');
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-
-  // Sort: price asc, no price last
-  unique.sort((a, b) => {
-    if (a.price && b.price) return a.price - b.price;
-    if (a.price) return -1;
-    if (b.price) return 1;
-    return 0;
-  });
-
-  return res.json({
-    success: true,
-    results: unique,
-    meta: {
-      query,
-      location: locationQuery,
-      total: unique.length,
-      sourcesScanned: scrapers.length,
-      errors: errors.length ? errors : undefined,
-    }
-  });
-});
-
-// =============================================
-// SCRAPER: Indotrading.com
-// =============================================
-async function scrapeIndotrading(query, location) {
-  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-  const results = [];
-  try {
-    const page = await browser.newPage();
-    await page.setExtraHTTPHeaders({ 'Accept-Language': 'id-ID,id;q=0.9' });
-    const url = `https://indotrading.com/search/?keywords=${encodeURIComponent(query)}&location=${encodeURIComponent(location)}`;
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
-
-    const items = await page.evaluate(() => {
-      const cards = document.querySelectorAll('.company-item, .product-company, [class*="company-card"], .item-company');
-      return Array.from(cards).slice(0, 15).map(card => ({
-        name: card.querySelector('[class*="company-name"], h3, h2, .name')?.textContent?.trim() || '',
-        location: card.querySelector('[class*="location"], .city, .address')?.textContent?.trim() || '',
-        phone: card.querySelector('[class*="phone"], .telp, [href^="tel:"]')?.textContent?.trim() || '',
-        price: card.querySelector('[class*="price"], .harga')?.textContent?.trim() || '',
-        url: card.querySelector('a[href*="indotrading"]')?.href || window.location.href,
-        description: card.querySelector('[class*="desc"], p')?.textContent?.trim() || '',
-      }));
-    });
-
-    items.forEach((item, i) => {
-      if (!item.name) return;
-      results.push({
-        id: `indotrading_${Date.now()}_${i}`,
-        name: item.name,
-        location: item.location || location,
-        province: guessProvince(item.location || location),
-        phone: cleanPhone(item.phone),
-        whatsapp: cleanWhatsApp(item.phone),
-        price: parsePrice(item.price),
-        priceUnit: 'unit',
-        source: 'indotrading',
-        sourceUrl: item.url,
-        description: item.description,
-        verified: Math.random() > 0.4,
-        scrapedAt: new Date().toISOString(),
-      });
-    });
-  } catch(e) {
-    console.error('Indotrading scrape error:', e.message);
-  } finally {
-    await browser.close();
-  }
-  return results;
-}
-
-// =============================================
-// SCRAPER: Indonetwork.co.id
-// =============================================
-async function scrapeIndonetwork(query, location) {
-  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-  const results = [];
-  try {
-    const page = await browser.newPage();
-    const url = `https://www.indonetwork.co.id/search?q=${encodeURIComponent(query)}&location=${encodeURIComponent(location)}`;
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
-
-    const items = await page.evaluate(() => {
-      const cards = document.querySelectorAll('.product-item, .company-list-item, [class*="product-card"], .item');
-      return Array.from(cards).slice(0, 15).map(card => ({
-        name: card.querySelector('h3, h2, .company-name, .product-name, [class*="name"]')?.textContent?.trim() || '',
-        location: card.querySelector('.location, .city, [class*="city"]')?.textContent?.trim() || '',
-        phone: card.querySelector('.phone, [class*="telp"], [href^="tel:"]')?.textContent?.trim() || '',
-        price: card.querySelector('.price, [class*="harga"], [class*="price"]')?.textContent?.trim() || '',
-        url: card.querySelector('a')?.href || '',
-      }));
-    });
-
-    items.forEach((item, i) => {
-      if (!item.name) return;
-      results.push({
-        id: `indonetwork_${Date.now()}_${i}`,
-        name: item.name,
-        location: item.location || location,
-        province: guessProvince(item.location || location),
-        phone: cleanPhone(item.phone),
-        whatsapp: cleanWhatsApp(item.phone),
-        price: parsePrice(item.price),
-        priceUnit: 'unit',
-        source: 'indonetwork',
-        sourceUrl: item.url,
-        verified: Math.random() > 0.5,
-        scrapedAt: new Date().toISOString(),
-      });
-    });
-  } catch(e) {
-    console.error('Indonetwork scrape error:', e.message);
-  } finally {
-    await browser.close();
-  }
-  return results;
-}
-
-// =============================================
-// SCRAPER: DuckDuckGo Web Search (gratis, no API key)
-// =============================================
-async function scrapeWebSearch(query, location, extra = '') {
-  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-  const results = [];
-  try {
-    const page = await browser.newPage();
-    const searchQuery = `${query} ${extra} ${location} site:*.co.id OR site:*.com`;
-    const url = `https://duckduckgo.com/?q=${encodeURIComponent(searchQuery)}&kl=id-id`;
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
-    await page.waitForTimeout(2000);
-
-    const items = await page.evaluate(() => {
-      const links = document.querySelectorAll('[data-result="snippet"], article[data-testid="result"]');
-      return Array.from(links).slice(0, 12).map(el => ({
-        title: el.querySelector('[data-result="title"], h2, .result__title')?.textContent?.trim() || '',
-        snippet: el.querySelector('[data-result="snippet"], .result__snippet, [class*="snippet"]')?.textContent?.trim() || '',
-        url: el.querySelector('a[href^="http"]')?.href || '',
-      }));
-    });
-
-    items.forEach((item, i) => {
-      if (!item.title || !item.url) return;
-      // Filter: must look like a business
-      const titleLower = item.title.toLowerCase();
-      const isBiz = ['cv ', 'pt ', 'ud ', 'toko', 'supplier', 'distributor', 'pabrik', 'dagang', 'industry', 'industri'].some(k => titleLower.includes(k));
-      if (!isBiz && i > 4) return;
-
-      const phone = extractPhone(item.snippet);
-      const wa = extractWA(item.snippet);
-      const price = parsePrice(item.snippet);
-
-      results.push({
-        id: `web_${Date.now()}_${i}`,
-        name: item.title.replace(/\s*[-|].*$/, '').trim(),
-        location: location,
-        province: guessProvince(location),
-        phone,
-        whatsapp: wa || (phone ? phone.replace(/^0/, '62') : null),
-        price,
-        priceUnit: 'unit',
-        source: 'web',
-        sourceUrl: item.url,
-        description: item.snippet?.slice(0, 200),
-        verified: false,
-        scrapedAt: new Date().toISOString(),
-      });
-    });
-  } catch(e) {
-    console.error('Web search scrape error:', e.message);
-  } finally {
-    await browser.close();
-  }
-  return results;
-}
-
-// =============================================
-// SCRAPER: Google Maps (via DuckDuckGo maps query)
-// =============================================
-async function scrapeGoogleMaps(query, location) {
-  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-  const results = [];
-  try {
-    const page = await browser.newPage();
-    // Use DuckDuckGo local search as proxy for business listings
-    const url = `https://duckduckgo.com/?q=${encodeURIComponent(query + ' toko supplier ' + location)}&iaxm=places`;
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
-    await page.waitForTimeout(2000);
-
-    const items = await page.evaluate(() => {
-      const places = document.querySelectorAll('.result--places-item, [class*="place-result"], [data-testid="map-result"]');
-      return Array.from(places).slice(0, 10).map(el => ({
-        name: el.querySelector('[class*="name"], h3, strong')?.textContent?.trim() || '',
-        address: el.querySelector('[class*="address"], address, [class*="street"]')?.textContent?.trim() || '',
-        phone: el.querySelector('[class*="phone"], [href^="tel:"]')?.textContent?.trim() || '',
-        rating: el.querySelector('[class*="rating"], .stars')?.textContent?.trim() || '',
-      }));
-    });
-
-    items.forEach((item, i) => {
-      if (!item.name) return;
-      results.push({
-        id: `gmaps_${Date.now()}_${i}`,
-        name: item.name,
-        location: item.address || location,
-        province: guessProvince(item.address || location),
-        address: item.address,
-        phone: cleanPhone(item.phone),
-        whatsapp: null,
-        price: null,
-        source: 'gmaps',
-        rating: parseFloat(item.rating) || null,
-        verified: true,
-        scrapedAt: new Date().toISOString(),
-      });
-    });
-  } catch(e) {
-    console.error('Google Maps scrape error:', e.message);
-  } finally {
-    await browser.close();
-  }
-  return results;
-}
-
-// =============================================
-// SCRAPER: Facebook Marketplace/Groups (public pages)
-// =============================================
-async function scrapeFacebook(query, location) {
-  // FB is heavily gated, use search engine approach for FB pages
-  return scrapeWebSearch(query, location, 'facebook.com supplier bisnis');
-}
-
-// =============================================
-// SCRAPER: OLX Indonesia (business sellers)
-// =============================================
-async function scrapeOLX(query, location) {
-  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-  const results = [];
-  try {
-    const page = await browser.newPage();
-    const url = `https://www.olx.co.id/items/q-${encodeURIComponent(query.replace(/\s+/g,'-'))}`;
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
-
-    const items = await page.evaluate(() => {
-      const cards = document.querySelectorAll('[data-aut-id="itemBox"], .EIR5N, [class*="listingCard"]');
-      return Array.from(cards).slice(0, 12).map(card => ({
-        name: card.querySelector('[data-aut-id="itemTitle"], .fHV1r, h2')?.textContent?.trim() || '',
-        location: card.querySelector('[data-aut-id="item-location"], .IHigt, [class*="location"]')?.textContent?.trim() || '',
-        price: card.querySelector('[data-aut-id="itemPrice"], .SiGMV, [class*="price"]')?.textContent?.trim() || '',
-        url: card.querySelector('a')?.href || '',
-      }));
-    });
-
-    items.forEach((item, i) => {
-      if (!item.name) return;
-      // Filter: only business-sounding listings
-      const name = item.name.toLowerCase();
-      const isBiz = ['cv', 'pt ', 'ud ', 'toko', 'supplier', 'grosir', 'partai', 'distributor'].some(k => name.includes(k));
-      if (!isBiz && Math.random() > 0.4) return;
-
-      results.push({
-        id: `olx_${Date.now()}_${i}`,
-        name: item.name,
-        location: item.location || location,
-        province: guessProvince(item.location || location),
-        price: parsePrice(item.price),
-        priceUnit: 'unit',
-        source: 'olx',
-        sourceUrl: item.url,
-        scrapedAt: new Date().toISOString(),
-      });
-    });
-  } catch(e) {
-    console.error('OLX scrape error:', e.message);
-  } finally {
-    await browser.close();
-  }
-  return results;
-}
-
-// =============================================
-// UTILITY FUNCTIONS
-// =============================================
-function cleanPhone(raw) {
-  if (!raw) return null;
-  const match = raw.match(/(?:0|\+62|62)[\d\-\s]{8,14}/);
-  return match ? match[0].replace(/[\s\-]/g, '') : null;
-}
-
-function cleanWhatsApp(raw) {
-  const phone = cleanPhone(raw);
-  if (!phone) return null;
-  return phone.replace(/^0/, '62').replace(/^\+/, '');
-}
 
 function extractPhone(text) {
   if (!text) return null;
-  const match = text.match(/(?:0|\+62|62)[\d\-\s]{8,13}/);
-  return match ? match[0].replace(/[\s\-]/g, '') : null;
+  const match = text.match(/(\+62|62|0)[0-9\-\s]{8,14}/);
+  return match ? match[0].replace(/\s/g, '') : null;
 }
 
-function extractWA(text) {
-  if (!text) return null;
-  const match = text.match(/(?:wa|whatsapp)[:\s]+(?:0|\+62|62)[\d]{8,12}/i);
-  if (match) return cleanWhatsApp(match[0]);
-  return null;
-}
-
-function parsePrice(raw) {
-  if (!raw) return null;
-  const match = raw.match(/(?:Rp\.?\s*|IDR\s*)?([\d.,]+)/i);
-  if (!match) return null;
-  const num = parseInt(match[1].replace(/[.,]/g, ''));
-  if (num < 100 || num > 100000000000) return null;
-  return num;
-}
-
-function guessProvince(locationStr) {
-  if (!locationStr) return '';
-  const l = locationStr.toLowerCase();
+function guessProvince(location) {
   const map = {
-    'jakarta': 'DKI Jakarta', 'jkt': 'DKI Jakarta',
-    'surabaya': 'Jawa Timur', 'sidoarjo': 'Jawa Timur', 'gresik': 'Jawa Timur', 'malang': 'Jawa Timur',
-    'bandung': 'Jawa Barat', 'bekasi': 'Jawa Barat', 'depok': 'Jawa Barat', 'bogor': 'Jawa Barat',
-    'semarang': 'Jawa Tengah', 'solo': 'Jawa Tengah', 'yogyakarta': 'DI Yogyakarta', 'jogja': 'DI Yogyakarta',
-    'medan': 'Sumatera Utara', 'makassar': 'Sulawesi Selatan', 'balikpapan': 'Kalimantan Timur',
-    'tangerang': 'Banten', 'serang': 'Banten', 'palembang': 'Sumatera Selatan',
-    'batam': 'Kepulauan Riau', 'pekanbaru': 'Riau',
+    'jakarta': 'DKI Jakarta', 'bandung': 'Jawa Barat', 'surabaya': 'Jawa Timur',
+    'medan': 'Sumatera Utara', 'makassar': 'Sulawesi Selatan', 'semarang': 'Jawa Tengah',
+    'yogyakarta': 'DIY', 'bali': 'Bali', 'denpasar': 'Bali', 'palembang': 'Sumatera Selatan',
+    'balikpapan': 'Kalimantan Timur', 'pontianak': 'Kalimantan Barat',
   };
-  for (const [city, province] of Object.entries(map)) {
-    if (l.includes(city)) return province;
+  const loc = (location || '').toLowerCase();
+  for (const [key, val] of Object.entries(map)) {
+    if (loc.includes(key)) return val;
   }
-  return '';
+  return location || 'Indonesia';
 }
 
-// =============================================
-// START SERVER
-// =============================================
+async function searchDuckDuckGo(query, location) {
+  try {
+    const searchQuery = encodeURIComponent(`${query} supplier distributor ${location} Indonesia`);
+    const url = `https://html.duckduckgo.com/html/?q=${searchQuery}`;
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept': 'text/html' }
+    });
+    const html = await response.text();
+    const results = [];
+    const resultRegex = /<a class="result__a"[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/g;
+    const snippetRegex = /<a class="result__snippet"[^>]*>([^<]*)<\/a>/g;
+    const links = [...html.matchAll(resultRegex)].slice(0, 10);
+    const snippets = [...html.matchAll(snippetRegex)].map(m => m[1]);
+    links.forEach((match, i) => {
+      const url = match[1];
+      const title = match[2].trim();
+      const snippet = snippets[i] || '';
+      if (!title || !url) return;
+      const phone = extractPhone(snippet);
+      results.push({
+        id: `ddg_${Date.now()}_${i}`,
+        name: title,
+        location: location,
+        province: guessProvince(location),
+        phone: phone,
+        whatsapp: phone ? phone.replace(/^0/, '62') : null,
+        price: null,
+        priceUnit: 'unit',
+        source: 'web',
+        sourceUrl: url,
+        snippet: snippet,
+        scrapedAt: new Date().toISOString(),
+      });
+    });
+    return results;
+  } catch (e) {
+    console.error('DuckDuckGo error:', e.message);
+    return [];
+  }
+}
+
+async function searchIndotrading(query, location) {
+  try {
+    const searchQuery = encodeURIComponent(query);
+    const url = `https://indotrading.com/search/?keywords=${searchQuery}`;
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept': 'text/html' },
+      signal: AbortSignal.timeout(10000)
+    });
+    const html = await response.text();
+    const results = [];
+    const companyRegex = /href="(https:\/\/www\.indotrading\.com\/[^"]+)"[^>]*>([^<]{5,60})<\/a>/g;
+    const matches = [...html.matchAll(companyRegex)].slice(0, 8);
+    matches.forEach((match, i) => {
+      const companyUrl = match[1];
+      const companyName = match[2].trim();
+      if (!companyName || companyName.length < 3) return;
+      if (companyName.toLowerCase().includes('indotrading')) return;
+      results.push({
+        id: `indo_${Date.now()}_${i}`,
+        name: companyName,
+        location: location,
+        province: guessProvince(location),
+        phone: null,
+        whatsapp: null,
+        price: null,
+        priceUnit: 'unit',
+        source: 'indotrading',
+        sourceUrl: companyUrl,
+        scrapedAt: new Date().toISOString(),
+      });
+    });
+    return results;
+  } catch (e) {
+    console.error('Indotrading error:', e.message);
+    return [];
+  }
+}
+
+async function searchIndonetwork(query, location) {
+  try {
+    const searchQuery = encodeURIComponent(query);
+    const url = `https://www.indonetwork.co.id/products/${searchQuery}`;
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept': 'text/html' },
+      signal: AbortSignal.timeout(10000)
+    });
+    const html = await response.text();
+    const results = [];
+    const nameRegex = /<h\d[^>]*class="[^"]*(?:product|company|title)[^"]*"[^>]*>([^<]{5,80})<\/h\d>/gi;
+    const matches = [...html.matchAll(nameRegex)].slice(0, 8);
+    matches.forEach((match, i) => {
+      const name = match[1].trim();
+      if (!name || name.length < 3) return;
+      results.push({
+        id: `idn_${Date.now()}_${i}`,
+        name: name,
+        location: location,
+        province: guessProvince(location),
+        phone: null,
+        whatsapp: null,
+        price: null,
+        priceUnit: 'unit',
+        source: 'indonetwork',
+        sourceUrl: url,
+        scrapedAt: new Date().toISOString(),
+      });
+    });
+    return results;
+  } catch (e) {
+    console.error('Indonetwork error:', e.message);
+    return [];
+  }
+}
+
+app.post('/api/search', async (req, res) => {
+  const { itemName, itemSpec, itemQty, location, sources = [] } = req.body;
+  if (!itemName) return res.status(400).json({ error: 'itemName diperlukan' });
+  const query = [itemName, itemSpec].filter(Boolean).join(' ');
+  const locationQuery = location || 'Indonesia';
+  console.log(`Searching: "${query}" in "${locationQuery}"`);
+  try {
+    const scrapers = [];
+    if (!sources.length || sources.includes('web')) scrapers.push(searchDuckDuckGo(query, locationQuery));
+    if (!sources.length || sources.includes('indotrading')) scrapers.push(searchIndotrading(query, locationQuery));
+    if (!sources.length || sources.includes('indonetwork')) scrapers.push(searchIndonetwork(query, locationQuery));
+    const settled = await Promise.allSettled(scrapers);
+    let allResults = [];
+    settled.forEach(r => { if (r.status === 'fulfilled') allResults.push(...(r.value || [])); });
+    const seen = new Set();
+    const unique = allResults.filter(s => {
+      const key = `${s.name}_${s.location}`.toLowerCase().replace(/\s+/g, '');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    console.log(`Found ${unique.length} results`);
+    res.json({ success: true, query, location: locationQuery, total: unique.length, results: unique });
+  } catch (error) {
+    console.error('Search error:', error);
+    res.status(500).json({ error: 'Gagal melakukan pencarian', detail: error.message });
+  }
+});
+
+app.post('/api/sync-sheets', async (req, res) => {
+  const { scriptUrl, data } = req.body;
+  if (!scriptUrl) return res.status(400).json({ error: 'scriptUrl diperlukan' });
+  try {
+    const response = await fetch(scriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await response.text();
+    res.json({ success: true, result });
+  } catch (e) {
+    res.status(500).json({ error: 'Gagal sync ke Google Sheets', detail: e.message });
+  }
+});
+
+app.get('/api/sheets-data', async (req, res) => {
+  const { scriptUrl } = req.query;
+  if (!scriptUrl) return res.status(400).json({ error: 'scriptUrl diperlukan' });
+  try {
+    const response = await fetch(scriptUrl);
+    const data = await response.json();
+    res.json({ success: true, data });
+  } catch (e) {
+    res.status(500).json({ error: 'Gagal ambil data dari Sheets', detail: e.message });
+  }
+});
+
 app.listen(PORT, () => {
-  console.log(`✅ Price Hunter Pro Backend running on port ${PORT}`);
+  console.log(`Price Hunter Pro Backend running on port ${PORT}`);
+  console.log(`Mode: Lightweight - no Chromium`);
 });
